@@ -79,27 +79,27 @@ class Parser(sly_Parser):
     
     @_('PROGRAM IS declarations IN commands END')
     def main(self, p):
-        pass
+        return (p.declarations, p.commands)
 
     @_('PROGRAM IS IN commands END')
     def main(self, p):
-        pass
+        return p.commands
 
     @_('commands command')
     def commands(self, p):
-        pass
+        return p.commands + [p.command]
 
     @_('command')
     def commands(self, p):
-        pass
+        return [p.command]
 
     @_('identifier ASSIGN expression ";"')
     def command(self, p):
-        pass
+        return ('ASSIGN', p.identifier, p.expression)
 
     @_('IF condition THEN commands ELSE commands ENDIF')
     def command(self, p):
-        pass
+        return ("IF ELSE", p.condition, p.commands0, p.commands1)
 
     @_('IF condition THEN commands ENDIF')
     def command(self, p):
@@ -111,7 +111,7 @@ class Parser(sly_Parser):
 
     @_('REPEAT commands UNTIL condition ";"')
     def command(self, p):
-        pass
+        return ("REPEAT", p.commands, p.condition)
 
     @_('proc_call ";"')
     def command(self, p):
@@ -119,11 +119,11 @@ class Parser(sly_Parser):
 
     @_('READ identifier ";"')
     def command(self, p):
-        pass
+        return ('READ', p.identifier)
 
     @_('WRITE value ";"')
     def command(self, p):
-        pass
+        return ("WRITE", p.value)
 
     @_('PIDENTIFIER "(" args_decl ")"')
     def proc_head(self, p):
@@ -135,7 +135,7 @@ class Parser(sly_Parser):
 
     @_('declarations "," PIDENTIFIER')
     def declarations(self, p):
-        pass
+        return ("DECL", p.declarations + [p.PIDENTIFIER])
 
     @_('declarations "," PIDENTIFIER "[" NUM "]"')
     def declarations(self, p):
@@ -143,7 +143,7 @@ class Parser(sly_Parser):
 
     @_('PIDENTIFIER')
     def declarations(self, p):
-        pass
+        return [p.PIDENTIFIER]
 
     @_('PIDENTIFIER "[" NUM "]"')
     def declarations(self, p):
@@ -187,11 +187,11 @@ class Parser(sly_Parser):
 
     @_('value "*" value')
     def expression(self, p):
-        pass
+        return ('MUL', p.value0, p.value1)
 
     @_('value "/" value')
     def expression(self, p):
-        pass
+        return ('DIV', p.value0, p.value1)
 
     @_('value "%" value')
     def expression(self, p):
@@ -199,7 +199,7 @@ class Parser(sly_Parser):
 
     @_('value EQ value')
     def condition(self, p):
-        pass
+        return ("EQ", p.value0, p.value1)
 
     @_('value NEQ value')
     def condition(self, p):
@@ -207,7 +207,7 @@ class Parser(sly_Parser):
 
     @_('value GT value')
     def condition(self, p):
-        pass
+        return ("GT", p.value0, p.value1)
 
     @_('value LT value')
     def condition(self, p):
@@ -223,15 +223,15 @@ class Parser(sly_Parser):
 
     @_('NUM')
     def value(self, p):
-        pass
+        return ("NUM", int(p.NUM))
 
     @_('identifier')
     def value(self, p):
-        pass
+        return p.identifier
 
     @_('PIDENTIFIER')
     def identifier(self, p):
-        pass
+        return ("VAR", p.PIDENTIFIER)
 
     @_('PIDENTIFIER "[" NUM "]"')
     def identifier(self, p):
@@ -247,4 +247,3 @@ source_code = argv[1]
 with open(source_code, 'r') as f:
     code = f.read()
     parser.parse(lexer.tokenize(code))
-
