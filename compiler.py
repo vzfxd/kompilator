@@ -11,15 +11,19 @@ class Lexer(sly_Lexer):
         READ,WRITE,
         PROGRAM,PROCEDURE,IS,IN,END,
         EQ, NEQ, GT, LT, GEQ, LEQ,
-        NUM,PIDENTIFIER 
+        NUM,PIDENTIFIER
     }
 
     literals = {
         '(',')',
         '[',']',
-        ';','T',','
-        '+','-','*','/','%'
+        ';','T',',',
+        '+','-','*','/','%',
     }
+
+    ignore_comment = r'\#.*'
+    ignore_newline = r'\n+'
+    ignore_spaces = r'[ \t]'
 
     ASSIGN = r':='
 
@@ -241,6 +245,6 @@ lexer = Lexer()
 parser = Parser()
 source_code = argv[1]
 with open(source_code, 'r') as f:
-    code = f.readlines()
-    for line in code:
-        print(line,end='')
+    code = f.read()
+    parser.parse(lexer.tokenize(code))
+
