@@ -2,7 +2,7 @@ from sly import Lexer as sly_Lexer
 from sly import Parser as sly_Parser
 from sys import argv
 
-def get_decl_var_list(decl_var):
+def get_var_from_decl(decl_var):
     l = []
     for var in decl_var:
         type = var[0]
@@ -17,6 +17,12 @@ class Identifier():
         self.name = name
         self.size = size
 
+    def __repr__(self):
+        str = f"{self.type},{self.name}"
+        if(self.size != None):
+            str += f',{self.size}'
+        return f"({str})"
+
 class Procedure():
     def __init__(self, proc_info):
         head = proc_info[0]
@@ -28,39 +34,37 @@ class Procedure():
         else:
             commands = proc_info[1]
 
-        self.name = head[0]
         self.args = []
-        self.decl_var = []
-        self.commands = []
-        self.decl_var = get_decl_var_list(decl_var)
-
         for arg in head[1]:
             type = arg[0]
             arg_name = arg[1]
             self.args.append(Identifier(type,arg_name))
 
-        for c in commands:
-            print(c)
-        print()
-
-class Command():
-    def __init__(self, command_info):
-        pass
+        self.name = head[0]
+        self.decl_var = get_var_from_decl(decl_var)
+        self.commands = commands
 
 class Program():
+
+    def __init__(self):
+        self.procedures = []
+        self.main = []
+
     def set_declarations(self, decl_var):
         pass
 
     def set_commands(self, commands):
         pass
 
+    def error_check(self, scope):
+        pass
+
 
 class CodeGen():
     def __init__(self):
-        self.procedures = []
-        self.main = Program()
+        pass
 
-    def error_check(self, scope):
+    def gen(self):
         pass
 
 class Lexer(sly_Lexer):
@@ -109,12 +113,12 @@ class Lexer(sly_Lexer):
     IN = r'IN'
     END = r'END'
 
-    EQ = r'='
     NEQ = r'!='
-    GT = r'>'
-    LT = r'<'
     GEQ = r'>='
     LEQ = r'<='
+    EQ = r'='
+    GT = r'>'
+    LT = r'<'
 
     PIDENTIFIER = r'[_a-z]+'
     NUM = r'\d+'
@@ -122,8 +126,8 @@ class Lexer(sly_Lexer):
 class Parser(sly_Parser):
     tokens = Lexer.tokens
 
-    def __init__(self, codeGen: CodeGen):
-        self.ctx = codeGen
+    def __init__(self, program: Program):
+        self.ctx = program
 
     @_('procedures main')
     def program_all(self, p):
@@ -181,7 +185,7 @@ class Parser(sly_Parser):
 
     @_('REPEAT commands UNTIL condition ";"')
     def command(self, p):
-        return ("REPEAT", p.commands, p.condition)
+        return ("REPEAT", p.condition, p.commands)
 
     @_('proc_call ";"')
     def command(self, p):
@@ -217,7 +221,7 @@ class Parser(sly_Parser):
 
     @_('PIDENTIFIER "[" NUM "]"')
     def declarations(self, p):
-        return ("ARR_NUM", p.PIDENTIFIER, p.NUM)
+        return [("ARR_NUM", p.PIDENTIFIER, p.NUM)]
 
     @_('args_decl "," PIDENTIFIER')
     def args_decl(self, p):
@@ -233,15 +237,15 @@ class Parser(sly_Parser):
 
     @_('"T" PIDENTIFIER')
     def args_decl(self, p):
-        return ("ARR", p.PIDENTIFIER)
+        return [("ARR", p.PIDENTIFIER)]
     
     @_('args "," PIDENTIFIER')
     def args(self, p):
-        return p.args + [("VAR",p.PIDENTIFIER)] 
+        return p.args + [p.PIDENTIFIER] 
 
     @_('PIDENTIFIER')
     def args(self, p):
-        return [("VAR",p.PIDENTIFIER)] 
+        return [p.PIDENTIFIER] 
 
     @_('value')
     def expression(self, p):
@@ -311,9 +315,14 @@ class Parser(sly_Parser):
     def identifier(self, p):
         return ("ARR_PID", p.PIDENTIFIER0, p.PIDENTIFIER1)
 
+program = Program()
 lexer = Lexer()
-parser = Parser(CodeGen())
+parser = Parser(program)
+code_gen = CodeGen()
+
 source_code = argv[1]
 with open(source_code, 'r') as f:
     code = f.read()
     parser.parse(lexer.tokenize(code))
+
+code_gen.gen()
