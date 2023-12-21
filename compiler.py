@@ -3,6 +3,7 @@ from sly import Parser as sly_Parser
 from sys import argv
 
 def get_var_from_decl(decl_var):
+    if(decl_var == None): return []
     l = []
     for var in decl_var:
         type = var[0]
@@ -44,20 +45,30 @@ class Procedure():
         self.decl_var = get_var_from_decl(decl_var)
         self.commands = commands
 
+    def __repr__(self):
+        return f"name:{self.name} \n args:{self.args} \n decl_var:{self.decl_var} \n commands:{self.commands}\n\n"
+
 class Program():
 
     def __init__(self):
         self.procedures = []
-        self.main = []
+        self.main_decl = []
+        self.main_commands = []
 
     def set_declarations(self, decl_var):
-        pass
+        self.main_decl = get_var_from_decl(decl_var)
 
     def set_commands(self, commands):
-        pass
+        self.main_commands = commands
+
+    def set_procedures(self, procedures):
+        self.procedures = [Procedure(pr) for pr in procedures]
 
     def error_check(self, scope):
         pass
+
+    def __repr__(self):
+        return f"PROCEDURES:\n\n{self.procedures} \n\n DECL IN MAIN:{self.main_decl}\n\n COMMANDS IN MAIN:{self.main_commands}\n"
 
 
 class CodeGen():
@@ -131,11 +142,9 @@ class Parser(sly_Parser):
 
     @_('procedures main')
     def program_all(self, p):
-        for pr in p.procedures:
-            self.ctx.procedures.append(Procedure(pr))
-        
-        self.ctx.main.set_declarations(p.main[0])
-        self.ctx.main.set_commands(p.main[1])
+        self.ctx.set_procedures(p.procedures)
+        self.ctx.set_declarations(p.main[0])
+        self.ctx.set_commands(p.main[1])
 
             
     
@@ -325,4 +334,5 @@ with open(source_code, 'r') as f:
     code = f.read()
     parser.parse(lexer.tokenize(code))
 
+print(program)
 code_gen.gen()
