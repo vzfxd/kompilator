@@ -2,6 +2,67 @@ from sly import Lexer as sly_Lexer
 from sly import Parser as sly_Parser
 from sys import argv
 
+def get_decl_var_list(decl_var):
+    l = []
+    for var in decl_var:
+        type = var[0]
+        var_name = var[1]
+        size = None if type == "VAR" else var[2]
+        l.append(Identifier(type,var_name,size))
+    return l
+
+class Identifier():
+    def __init__(self, type, name, size=None):
+        self.type = type
+        self.name = name
+        self.size = size
+
+class Procedure():
+    def __init__(self, proc_info):
+        head = proc_info[0]
+        decl_var = None
+        commands = None
+        if(len(proc_info)==3):
+            decl_var = proc_info[1]
+            commands = proc_info[2]
+        else:
+            commands = proc_info[1]
+
+        self.name = head[0]
+        self.args = []
+        self.decl_var = []
+        self.commands = []
+        self.decl_var = get_decl_var_list(decl_var)
+
+        for arg in head[1]:
+            type = arg[0]
+            arg_name = arg[1]
+            self.args.append(Identifier(type,arg_name))
+
+        for c in commands:
+            print(c)
+        print()
+
+class Command():
+    def __init__(self, command_info):
+        pass
+
+class Program():
+    def set_declarations(self, decl_var):
+        pass
+
+    def set_commands(self, commands):
+        pass
+
+
+class CodeGen():
+    def __init__(self):
+        self.procedures = []
+        self.main = Program()
+
+    def error_check(self, scope):
+        pass
+
 class Lexer(sly_Lexer):
     tokens = {
         ASSIGN,
@@ -61,21 +122,30 @@ class Lexer(sly_Lexer):
 class Parser(sly_Parser):
     tokens = Lexer.tokens
 
+    def __init__(self, codeGen: CodeGen):
+        self.ctx = codeGen
+
     @_('procedures main')
     def program_all(self, p):
-        pass
+        for pr in p.procedures:
+            self.ctx.procedures.append(Procedure(pr))
+        
+        self.ctx.main.set_declarations(p.main[0])
+        self.ctx.main.set_commands(p.main[1])
+
+            
     
     @_('procedures PROCEDURE proc_head IS declarations IN commands END')
     def procedures(self, p):
-        pass
+        return p.procedures + [(p.proc_head, p.declarations, p.commands)]
 
     @_('procedures PROCEDURE proc_head IS IN commands END')
     def procedures(self, p):
-        pass
+        return p.procedures + [(p.proc_head, p.commands)]
 
     @_('')
     def procedures(self, p):
-        pass
+        return []
     
     @_('PROGRAM IS declarations IN commands END')
     def main(self, p):
@@ -103,11 +173,11 @@ class Parser(sly_Parser):
 
     @_('IF condition THEN commands ENDIF')
     def command(self, p):
-        pass
+        return ("IF", p.condition, p.commands)
     
     @_('WHILE condition DO commands ENDWHILE')
     def command(self, p):
-        pass
+        return ("WHILE", p.condition, p.commands)
 
     @_('REPEAT commands UNTIL condition ";"')
     def command(self, p):
@@ -115,7 +185,7 @@ class Parser(sly_Parser):
 
     @_('proc_call ";"')
     def command(self, p):
-        pass
+        return ("CALL",p.proc_call)
 
     @_('READ identifier ";"')
     def command(self, p):
@@ -127,63 +197,63 @@ class Parser(sly_Parser):
 
     @_('PIDENTIFIER "(" args_decl ")"')
     def proc_head(self, p):
-        pass
+        return (p.PIDENTIFIER, p.args_decl)
 
     @_('PIDENTIFIER "(" args ")"')
     def proc_call(self, p):
-        pass
+        return (p.PIDENTIFIER, p.args)
 
     @_('declarations "," PIDENTIFIER')
     def declarations(self, p):
-        return ("DECL", p.declarations + [p.PIDENTIFIER])
+        return p.declarations + [("VAR",p.PIDENTIFIER)]
 
     @_('declarations "," PIDENTIFIER "[" NUM "]"')
     def declarations(self, p):
-        pass
+        return p.declarations + [("ARR_NUM", p.PIDENTIFIER, p.NUM)]
 
     @_('PIDENTIFIER')
     def declarations(self, p):
-        return [p.PIDENTIFIER]
+        return [("VAR", p.PIDENTIFIER)]
 
     @_('PIDENTIFIER "[" NUM "]"')
     def declarations(self, p):
-        pass
+        return ("ARR_NUM", p.PIDENTIFIER, p.NUM)
 
     @_('args_decl "," PIDENTIFIER')
     def args_decl(self, p):
-        pass
+        return p.args_decl + [("VAR",p.PIDENTIFIER)] 
 
     @_('args_decl "," "T" PIDENTIFIER')
     def args_decl(self, p):
-        pass
+        return p.args_decl + [("ARR",p.PIDENTIFIER)]
 
     @_('PIDENTIFIER')
     def args_decl(self, p):
-        pass
+        return [("VAR",p.PIDENTIFIER)] 
 
     @_('"T" PIDENTIFIER')
     def args_decl(self, p):
-        pass
+        return ("ARR", p.PIDENTIFIER)
     
     @_('args "," PIDENTIFIER')
     def args(self, p):
-        pass
+        return p.args + [("VAR",p.PIDENTIFIER)] 
 
     @_('PIDENTIFIER')
     def args(self, p):
-        pass
+        return [("VAR",p.PIDENTIFIER)] 
 
     @_('value')
     def expression(self, p):
-        pass
+        return p.value;
     
     @_('value "+" value')
     def expression(self, p):
-        pass
+        return ('PLUS', p.value0, p.value1)
 
     @_('value "-" value')
     def expression(self, p):
-        pass
+        return ('MINUS', p.value0, p.value1)
 
     @_('value "*" value')
     def expression(self, p):
@@ -195,7 +265,7 @@ class Parser(sly_Parser):
 
     @_('value "%" value')
     def expression(self, p):
-        pass
+        return ('MOD', p.value0, p.value1)
 
     @_('value EQ value')
     def condition(self, p):
@@ -203,7 +273,7 @@ class Parser(sly_Parser):
 
     @_('value NEQ value')
     def condition(self, p):
-        pass
+        return ("NEQ", p.value0, p.value1)
 
     @_('value GT value')
     def condition(self, p):
@@ -211,15 +281,15 @@ class Parser(sly_Parser):
 
     @_('value LT value')
     def condition(self, p):
-        pass
+        return ("LT", p.value0, p.value1)
 
     @_('value GEQ value')
     def condition(self, p):
-        pass
+        return ("GEQ", p.value0, p.value1)
 
     @_('value LEQ value')
     def condition(self, p):
-        pass
+        return ("LEQ", p.value0, p.value1)
 
     @_('NUM')
     def value(self, p):
@@ -235,14 +305,14 @@ class Parser(sly_Parser):
 
     @_('PIDENTIFIER "[" NUM "]"')
     def identifier(self, p):
-        pass
+        return ("ARR_NUM", p.PIDENTIFIER, p.NUM)
 
     @_('PIDENTIFIER "[" PIDENTIFIER "]"')
     def identifier(self, p):
-        pass
+        return ("ARR_PID", p.PIDENTIFIER0, p.PIDENTIFIER1)
 
 lexer = Lexer()
-parser = Parser()
+parser = Parser(CodeGen())
 source_code = argv[1]
 with open(source_code, 'r') as f:
     code = f.read()
