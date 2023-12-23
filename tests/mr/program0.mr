@@ -1,12 +1,12 @@
 # prosta translacja z użyciem pamięci
 # n -> P0, p -> P1
-READ                   wczytanie zmiennej do rejestru a
-RST b                  reset rejestru b
-STORE b                wczytanie zmiennej do komórki val(r_b), czyli p0
-RST b                  reset rejestru b
-LOAD b                 wczytanie komórki val(r_b) do rejestru a
-SHR a                  dzielimy / 2 rejestr a
-SHL a                  mnozymy * 2 rejestr a
+READ                   
+RST b                  # r_b = 0
+STORE b                # p0 = r_a
+RST b                  # r_b = 0
+LOAD b                 # r_a 
+SHR a                  #dzielimy / 2 rejestr a
+SHL a                  #mnozymy * 2 rejestr a
 
      
 RST b                   

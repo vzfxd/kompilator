@@ -2,48 +2,57 @@ from sly import Lexer as sly_Lexer
 from sly import Parser as sly_Parser
 from sys import argv
 
-def get_var_from_decl(decl_var):
+def get_var_from_decl(decl_var, program_cells_taken):
     if(decl_var == None): return []
     l = []
+    cells_taken = 0
     for var in decl_var:
         type = var[0]
         var_name = var[1]
-        size = None if type == "VAR" else var[2]
-        l.append(Identifier(type,var_name,size))
-    return l
+        var_obj = None
+
+        if(type == "ARR_NUM"):
+            size = int(var[2])
+            var_obj = Identifier(type,var_name,size,program_cells_taken+cells_taken)
+            cells_taken += size
+        else:
+            var_obj = Identifier(type,var_name)
+        
+        l.append(var_obj)
+
+    return l,cells_taken
 
 class Identifier():
-    def __init__(self, type, name, size=None):
+    def __init__(self, type, name, size=None, start_cell=None):
         self.type = type
         self.name = name
         self.size = size
+        self.mem_cell = None
+        if(size != None):
+            self.start_cell = start_cell
+            self.mem_cell = [None]*size
 
     def __repr__(self):
         str = f"{self.type},{self.name}"
         if(self.size != None):
-            str += f',{self.size}'
+            str += f',size:{self.size},start:{self.start_cell},table:\n{self.mem_cell}'
+        else:
+            str += f',mem_cell:{self.mem_cell}'
         return f"({str})"
 
 class Procedure():
-    def __init__(self, proc_info):
-        head = proc_info[0]
-        decl_var = None
-        commands = None
-        if(len(proc_info)==3):
-            decl_var = proc_info[1]
-            commands = proc_info[2]
-        else:
-            commands = proc_info[1]
-
+    def __init__(self, name, args, commands, decl_var=None):
+        self.name = name
+        self.decl_var = get_var_from_decl(decl_var)
+        self.commands = commands
         self.args = []
-        for arg in head[1]:
+        for arg in args:
             type = arg[0]
             arg_name = arg[1]
             self.args.append(Identifier(type,arg_name))
 
-        self.name = head[0]
-        self.decl_var = get_var_from_decl(decl_var)
-        self.commands = commands
+    def set_args(self, args):
+        self.args = args
 
     def __repr__(self):
         return f"name:{self.name} \n args:{self.args} \n decl_var:{self.decl_var} \n commands:{self.commands}\n\n"
@@ -54,28 +63,138 @@ class Program():
         self.procedures = []
         self.main_decl = []
         self.main_commands = []
+        self.mem_cells_taken = 0
 
     def set_declarations(self, decl_var):
-        self.main_decl = get_var_from_decl(decl_var)
+        self.main_decl, cells_taken = get_var_from_decl(decl_var,self.mem_cells_taken)
+        self.mem_cells_taken += cells_taken
 
     def set_commands(self, commands):
         self.main_commands = commands
 
     def set_procedures(self, procedures):
-        self.procedures = [Procedure(pr) for pr in procedures]
+        for pr in procedures:
+            if(len(pr)==3):
+                self.procedures.append( Procedure(pr[0][0],pr[0][1],pr[2],pr[1]) )
+            else:
+                self.procedures.append( Procedure(pr[0][0],pr[0][1],pr[1]) )
 
     def error_check(self, scope):
         pass
 
+    # a := 5     sprwadzic czy "a" zainicjowane
+    # b[3] := 5  sprawdzic czy "a[3]" zainicjowane
+    # b[a] := 5  narazie zakladam ze "b" zainicjowane, sprwadzić "a[b]"
+    def check_var_init(self, name, type, idx, scope="main"):
+        var = None
+        if(scope == "main"):
+            var = self.find_var(name,type)
+        else:
+            pass
+            # pr = self.find_procedure(scope)
+            # var = self.find_var(name,type,pr)
+
+        mem_cell = None
+        if(type == "VAR"):
+            mem_cell = var.mem_cell
+        
+        if(type == "ARR_NUM"):
+            idx = int(idx)
+            mem_cell = var.mem_cell[idx]
+
+        if(type == "ARR_PID"):
+            idx_cell = self.check_var_init(idx)
+            mem_cell = var.mem_cell[idx_cell]
+            # if(idx_cell == None):
+            #     pass
+            #     #TODO err | b[a], gdzie "a" nie jest zainicjowane
+
+        return mem_cell, var
+            
+    def init_var(self, var: Identifier, idx=None):
+        if(idx == None):
+            var.mem_cell = self.mem_cells_taken
+            self.mem_cells_taken += 1
+        else:
+            idx = int(idx)
+            start = var.start_cell
+            var.mem_cell[idx] = start+idx
+
+    def find_var(self, name, type, scope="main"):
+        var_list = None
+        if(scope == "main"):
+            var_list = self.main_decl
+        else:
+            pass
+            #TODO: scope jakiejs procedury
+
+        for var in var_list:
+            if(var.name == name):
+                if(var.type != type):
+                    pass
+                    #TODO: type mismatch
+                return var
+        return None
+
+    def find_procedure(self, name):
+        for pr in self.procedures:
+            if(pr.name == name):
+                return pr
+        return None
+        
+
     def __repr__(self):
-        return f"PROCEDURES:\n\n{self.procedures} \n\n DECL IN MAIN:{self.main_decl}\n\n COMMANDS IN MAIN:{self.main_commands}\n"
+        x = f"PROCEDURES:\n\n{self.procedures} \n\n DECL IN MAIN:{self.main_decl}\n\n"
+        for c in self.main_commands:
+            x += f"{c}\n"
+        return f"{x}\n\n MEM CELLS TAKEN:{self.mem_cells_taken}"
+    
 
 
 class CodeGen():
-    def __init__(self):
-        pass
+    def __init__(self, program: Program):
+        self.program = program
 
     def gen(self):
+        main_commands = self.program.main_commands
+
+        for command in main_commands:
+            type = command[0]
+
+            if(type == "ASSIGN"):
+                self.gen_assign(command[1:])
+
+            if(type == "WRITE"):
+                self.gen_write_command(command[1:])
+    
+    def init_var(self):
+        pass
+
+    def gen_assign(self,command):
+        exp = command[1]
+        var = command[0]
+        var_type = var[0]
+        var_name = var[1]
+        var_idx = None
+        if(var_type != "VAR"):
+            var_idx = var[2]
+
+        mem_cell, var = self.program.check_var_init(var_name,var_type,var_idx)
+        if(mem_cell == None):
+            self.program.init_var(var,var_idx)
+
+        if(len(exp) == 2):
+            var2_type = exp[0]
+            var2_name = exp[1]
+
+            if(var2_type == "NUM"):
+
+        else:
+            pass
+        
+
+
+    def gen_write_command(self,command):
         pass
 
 class Lexer(sly_Lexer):
@@ -144,9 +263,7 @@ class Parser(sly_Parser):
     def program_all(self, p):
         self.ctx.set_procedures(p.procedures)
         self.ctx.set_declarations(p.main[0])
-        self.ctx.set_commands(p.main[1])
-
-            
+        self.ctx.set_commands(p.main[1])            
     
     @_('procedures PROCEDURE proc_head IS declarations IN commands END')
     def procedures(self, p):
@@ -327,12 +444,18 @@ class Parser(sly_Parser):
 program = Program()
 lexer = Lexer()
 parser = Parser(program)
-code_gen = CodeGen()
+code_gen = CodeGen(program)
 
 source_code = argv[1]
+debug = False
+if(len(argv)>2 and argv[2]=="-debug"):
+    debug = True
+
 with open(source_code, 'r') as f:
     code = f.read()
     parser.parse(lexer.tokenize(code))
 
-print(program)
 code_gen.gen()
+
+if(debug):
+    print(program)
