@@ -143,7 +143,7 @@ class Program():
             if(var.name == name):
                 return var
             
-        return None
+        raise RuntimeError(f"variable {name} not declared")
 
     def find_procedure(self, name):
         for pr in self.procedures:
