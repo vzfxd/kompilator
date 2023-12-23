@@ -1,4 +1,5 @@
 import utils
+from sys import exit
 from sly import Lexer as sly_Lexer
 from sly import Parser as sly_Parser
 from sys import argv
@@ -480,7 +481,12 @@ with open(source_code, 'r') as f:
     code = f.read()
     parser.parse(lexer.tokenize(code))
 
-code_gen.gen()
+try:
+    code_gen.gen()
+except RuntimeError as e:
+    print(e)
+    exit(1)
+    
 
 with open(target_code, 'w') as f:
     instructions = code_gen.instructions
