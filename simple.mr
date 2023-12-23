@@ -1,0 +1,25 @@
+RST h
+RST a
+INC a
+SHL a
+INC a
+SHL a
+SHL a
+INC a
+STORE h
+RST h
+LOAD h
+WRITE
+RST h
+INC h
+RST a
+INC a
+SHL a
+SHL a
+INC a
+STORE h
+RST h
+INC h
+LOAD h
+WRITE
+HALT

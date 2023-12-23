@@ -1,0 +1,8 @@
+PROGRAM IS
+	d, b
+IN
+    d := 13;
+    WRITE d;
+    b := 5;
+    WRITE b;
+END

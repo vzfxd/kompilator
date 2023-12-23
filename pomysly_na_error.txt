@@ -1,1 +1,0 @@
-1.nazwa zmiennej zadeklarowanej w procedurze taka sama jak argument
