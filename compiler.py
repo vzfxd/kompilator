@@ -5,68 +5,88 @@ from sly import Parser as sly_Parser
 from sys import argv
 
 class Identifier():
-    def __init__(self, type, name, size=None, start_cell=None):
-        self.val = None
-        self.mem_cell = None
-        self.type = type
+    def __init__(self, name):
         self.name = name
-        self.size = size
-        if(size != None):
-            self.start_cell = start_cell
-            self.mem_cell = [None]*size
 
-    def get_var(var):
-        var_type = var[0]
-        var_name = var[1]
-        var_idx = None
-        if(var_type != "VAR"):
-            var_idx = var[2]
-        return var_type,var_name,var_idx
+    def get_addr():
+        pass
+
+    def set_addr():
+        pass
     
-    def get_var_from_decl(decl_var, program_cells_taken):
-        if(decl_var == None): return []
+    def declare_variables(var_list, program_memory):
+        if(var_list == None): return []
         l = []
-        cells_taken = 0
-        for var in decl_var:
+        memory_taken = 0
+        for var in var_list:
             type = var[0]
             var_name = var[1]
             var_obj = None
 
             if(type == "ARR_NUM"):
                 size = int(var[2])
-                var_obj = Identifier(type,var_name,size,program_cells_taken+cells_taken)
-                cells_taken += size
+                var_obj = Array(var_name,size,program_memory+memory_taken)
+                memory_taken += size
             else:
-                var_obj = Identifier(type,var_name)
+                var_obj = Variable(var_name)
             
             l.append(var_obj)
 
-        return l,cells_taken
+        return l,memory_taken
+    
+class Array(Identifier):
+    def __init__(self, name, size, start_addr):
+        super().__init__(name)
+        self.start_addr = start_addr
+        self.variables = [Variable()]*size
+
+    def get_addr(self, idx):
+        return self.variables[idx].get_addr()
+        
+    def set_addr(self, idx):
+        self.variables[idx].set_addr(self.start_addr + idx)
+
+    def set_val(self, idx, val):
+        self.variables[idx].val = val
 
     def __repr__(self):
-        str = f"{self.type},{self.name}"
-        if(self.size != None):
-            str += f',size:{self.size},start:{self.start_cell},table:\n{self.mem_cell}'
-        else:
-            str += f',mem_cell:{self.mem_cell}'
-        return f"({str})"
+        return f"\n name:{self.name}, start_addr:{self.start_cell}, size:{self.size} \n addr:{self.addr} \n"
 
-class Procedure():
-    def __init__(self, name, args, commands, decl_var=None):
-        self.name = name
-        self.decl_var = Identifier.get_var_from_decl(decl_var)
-        self.commands = commands
-        self.args = []
-        for arg in args:
-            type = arg[0]
-            arg_name = arg[1]
-            self.args.append(Identifier(type,arg_name))
+class Variable(Identifier):
+    def __init__(self, name=None):
+        super().__init__(name)
+        self.val = None
+        self.addr = None
 
-    def set_args(self, args):
-        self.args = args
+    def get_addr(self, idx=None):
+        return self.addr
+        
+    def set_addr(self, addr):
+        self.addr = addr
+
+    def set_val(self, val):
+        self.val = val
 
     def __repr__(self):
-        return f"name:{self.name} \n args:{self.args} \n decl_var:{self.decl_var} \n commands:{self.commands}\n\n"
+        return f"\n name:{self.name}, addr:{self.addr}, val:{self.val}\n"
+
+# class Procedure():
+#     def __init__(self, name, args, commands, var_list=None):
+#         self.name = name
+#         self.decl_var = Identifier.declare_variables(var_list)
+#         self.commands = commands
+#         self.args = []
+#         for arg in args:
+#             print(f"arg:{arg}")
+#             type = arg[0]
+#             arg_name = arg[1]
+#             self.args.append(Identifier(type,arg_name))
+
+#     def set_args(self, args):
+#         self.args = args
+
+#     def __repr__(self):
+#         return f"name:{self.name} \n args:{self.args} \n decl_var:{self.decl_var} \n commands:{self.commands}\n\n"
 
 class Program():
 
@@ -76,63 +96,26 @@ class Program():
         self.main_commands = []
         self.mem_cells_taken = 0
 
-    def set_declarations(self, decl_var):
-        self.main_decl, cells_taken = Identifier.get_var_from_decl(decl_var,self.mem_cells_taken)
+    def set_declarations(self, var_list):
+        self.main_decl, cells_taken = Identifier.declare_variables(var_list,self.mem_cells_taken)
         self.mem_cells_taken += cells_taken
 
     def set_commands(self, commands):
         self.main_commands = commands
 
-    def set_procedures(self, procedures):
-        for pr in procedures:
-            if(len(pr)==3):
-                self.procedures.append( Procedure(pr[0][0],pr[0][1],pr[2],pr[1]) )
-            else:
-                self.procedures.append( Procedure(pr[0][0],pr[0][1],pr[1]) )
-
-    def error_check(self, scope):
-        pass
-
-    # a := c     sprwadzic czy "c" zainicjowane
-    # a := b[3]  sprawdzic czy "b[3]" zainicjowane
-    # a := b[c]  sprwadzic "c", potem b[c]
-    # a := b[c] sprwadzic czy d[c]
-    def check_var_init(self, name, type, idx=None, scope="main"):
-        var = None
-        if(scope == "main"):
-            var = self.find_var(name,type)
-        else:
-            pass
-            # pr = self.find_procedure(scope)
-            # var = self.find_var(name,type,pr)
-
-        mem_cell = None
-        if(type == "VAR"):
-            mem_cell = var.mem_cell
-        
-        if(type == "ARR_NUM"):
-            idx = int(idx)
-            mem_cell = var.mem_cell[idx]
-
-        if(type == "ARR_PID"):
-            var_idx_cell, var_idx = self.check_var_init(idx,"VAR")
-            if(var_idx_cell == None):
-                raise RuntimeError(f"{var_idx} not initialized")
-
-            mem_cell = var.mem_cell[var_idx.val]
-
-        return mem_cell, var
-            
-    def init_var(self, var: Identifier, idx=None):
-        if(idx == None):
-            var.mem_cell = self.mem_cells_taken
-            self.mem_cells_taken += 1
-        else:
-            idx = int(idx)
-            start = var.start_cell
-            var.mem_cell[idx] = start+idx
+    # def set_procedures(self, procedures):
+    #     for pr in procedures:
+    #         if(len(pr)==3):
+    #             self.procedures.append( Procedure(pr[0][0],pr[0][1],pr[2],pr[1]) )
+    #         else:
+    #             self.procedures.append( Procedure(pr[0][0],pr[0][1],pr[1]) ) 
 
     def find_var(self, name, type, scope="main"):
+        if(type == "VAR"):
+            type = Variable
+        else:
+            type = Array
+
         var_list = None
         if(scope == "main"):
             var_list = self.main_decl
@@ -140,21 +123,61 @@ class Program():
             pass
             #TODO: scope jakiejs procedury
 
+        found = []
         for var in var_list:
             if(var.name == name):
-                return var
+                found.append(var)
             
-        raise RuntimeError(f"variable {name} not declared")
+        if(len(found) > 1):
+            raise RuntimeError(f"identifier {name} declared more than once")
+        
+        if(len(found) == 0):
+            raise RuntimeError(f"{type} {name} not declared")
+        
+        var = found[0]
+        if(not isinstance(var,type)):
+            raise RuntimeError(f"wrong usage of {type} {name}")
+        
+        return var
+    
+    def init_var(self, var: Identifier, idx=None):
+        if(idx == None):
+            var.set_addr(self.mem_cells_taken)
+            self.mem_cells_taken += 1
+        else:
+            var.set_addr(idx)
 
-    def find_procedure(self, name):
-        for pr in self.procedures:
-            if(pr.name == name):
-                return pr
-        return None
+    def get_var_addr(self, var_raw):
+        var_type = var_raw[0]
+        var_name = var_raw[1]
+        var = self.find_var(var_name,var_type)
+
+        addr = var.get_addr()
+        idx = None
+
+        if(var_type == "ARR_NUM"):
+            idx = int(var[3])
+            addr = var.get_addr(idx)
+        if(var_type == "ARR_PID"):
+            idx_obj = self.program.find_var(var_raw[3],"VAR")
+            idx = idx_obj.val
+            addr = var.get_addr(idx)
+
+        if(addr == None):
+            self.init_var(var,idx)
+        addr = var.get_addr(idx)
+
+        return var, addr
+
+    # def find_procedure(self, name):
+    #     for pr in self.procedures:
+    #         if(pr.name == name):
+    #             return pr
+    #     return None
         
 
     def __repr__(self):
-        x = f"PROCEDURES:\n\n{self.procedures} \n\n DECL IN MAIN:{self.main_decl}\n\n"
+        x = f"PROCEDURES:\n\n{self.procedures} \n\n DECL IN MAIN:\n{self.main_decl}\n\n"
         for c in self.main_commands:
             x += f"{c}\n"
         return f"{x}\n\n MEM CELLS TAKEN:{self.mem_cells_taken}"
@@ -179,48 +202,37 @@ class CodeGen():
                 self.gen_write(command[1:])
 
         self.instructions.append("HALT")
-
-    def gen_addr(self, val):
-        pass
-
+    
     def gen_assign(self,command):
         exp = command[1]
-        var = command[0]
-        var_type, var_name, var_idx = Identifier.get_var(var)
+        var_raw = command[0]
 
-        mem_cell, var = self.program.check_var_init(var_name,var_type,var_idx)
-        if(mem_cell == None):
-                self.program.init_var(var,var_idx)
-        mem_cell = var.mem_cell
+        var, addr = self.program.get_var_addr(var_raw)
 
+        # identifier := jakas operacja
+        # identifier := val
+        # Zapisywanie do rejestru h adresu komórki pamięci zmiennej
+        # Zapisywanie do rejestru A wartości zmiennej
+        # Do komórki zapisywana jest wartośc zmiennej
         if(len(exp) > 2):
-            # identifier := jakas operacja
             pass
         else:
-            # identifier := val
+            val = exp[1]
+            val_type = exp[0]
+            self.instructions += utils.reach_number(addr,'h')
             
-            if(var_type == "VAR"):
-                # Zapisywanie do rejestru h adresu komórki pamięci zmiennej
-                val = exp[1]
-                val_type = exp[0]
-                self.instructions += utils.reach_number(mem_cell,'h')
-
-                if(val_type == "NUM"):
-                    # Zapisywanie do rejestru A wartości zmiennej
-                    # Do komórki zapisywana jest wartośc zmiennej
-                    self.instructions += utils.reach_number(int(val),'a')
-                    self.instructions.append("STORE h")
-                    var.val = val
+            if(val_type == "NUM"):
+                self.instructions += utils.reach_number(int(val),'a')
+                self.instructions.append("STORE h")
+                var.val = val
                 
 
     def gen_write(self,command):
-        var = command[0]
-        var_type, var_name, var_idx = Identifier.get_var(var)
-        mem_cell, var = self.program.check_var_init(var_name,var_type,var_idx)
+        var_raw = command[0]
+        _, addr = self.program.get_var_addr(var_raw)
 
-        if(var_type == "VAR"):
-            self.instructions += utils.reach_number(mem_cell,'h')
-            self.instructions += ["LOAD h","WRITE"]
+        self.instructions += utils.reach_number(addr,'h')
+        self.instructions += ["LOAD h","WRITE"]
 
 class Lexer(sly_Lexer):
     tokens = {
@@ -286,7 +298,7 @@ class Parser(sly_Parser):
 
     @_('procedures main')
     def program_all(self, p):
-        self.ctx.set_procedures(p.procedures)
+       #self.ctx.set_procedures(p.procedures)
         self.ctx.set_declarations(p.main[0])
         self.ctx.set_commands(p.main[1])            
     

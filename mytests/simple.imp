@@ -1,5 +1,5 @@
 PROGRAM IS
-	b,d
+	d,b
 IN
     d := 13;
     WRITE d;
