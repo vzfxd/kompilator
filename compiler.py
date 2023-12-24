@@ -211,7 +211,7 @@ class CodeGen():
             self.instructions += ["JPOS j"]
 
         if(type == "LEQ"):
-            self.instructions += ["JZERO j"]
+            self.instructions += ["JPOS j"]
 
         if(type in ["EQ","NEQ"]):
             self.put_to_reg('h')
@@ -221,7 +221,8 @@ class CodeGen():
                 self.instructions += ["JPOS j"]
             else:
                 self.instructions += ["JZERO j"]
-            
+    
+    # a <= b, a-b
     def gen_if(self, command, if_type):
         if_head = command[0]
         if_body = command[1]
