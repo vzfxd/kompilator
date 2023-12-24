@@ -125,29 +125,52 @@ class CodeGen():
     def load_from_memory(self, reg):
         self.instructions += [f"LOAD {reg}"]
 
+    def put_to_reg(self, reg):
+        self.instructions += [f"PUT {reg}"]
+
     def add_reg_to_acc(self, reg):
         self.instructions += [f"ADD {reg}"]
 
+    def reg_plus_reg(self, reg1, reg2):
+        self.instructions += [f"GET {reg1}", f"ADD {reg2}"]
+
+    def reg_minus_reg(self, reg1, reg2):
+        self.instructions += [f"GET {reg1}", f"SUB {reg2}"]
+
     def save_var_addr_to_reg(self, var: Identifier, reg, idx, idx_type):
         if(reg == 'a'): raise RuntimeError("adrr saved to accumulator")
+        
         if(isinstance(var,Variable)):
+            if(var.addr == None):
+                raise RuntimeError(f"Variable {var.name} not initialized")
             self.save_to_reg(var.addr, reg)
         else:
             if(idx_type == "ARR_NUM"):
                 self.save_to_reg(int(idx),'a')
             else:
                 idx_var = self.program.find_var(idx)
+                if(idx_var.addr == None):
+                    raise RuntimeError(f"Variable {idx_var.name} not initialized")
                 self.save_to_reg(idx_var.addr,reg)
                 self.load_from_memory(reg)
 
             self.save_to_reg(var.start_addr,reg)
             self.add_reg_to_acc(reg)
-            self.instructions += [f"PUT {reg}"]
+            self.put_to_reg(reg)
 
-    def gen(self):
-        main_commands = self.program.main_commands
+    def assign_var(self, val_raw, reg):
+        val_type, val_name, val_idx = Identifier.get_var(val_raw)    
+            
+        if(val_type == "NUM"):
+            self.save_to_reg(int(val_name),reg)
+        else:
+            val = self.program.find_var(val_name, val_type)
+            self.save_var_addr_to_reg(val,reg,val_idx,val_type)
+            self.load_from_memory(reg)
+            self.put_to_reg(reg)
 
-        for command in main_commands:
+    def gen(self, commands):
+        for command in commands:
             type = command[0]
 
             if(type == "ASSIGN"):
@@ -156,7 +179,53 @@ class CodeGen():
             if(type == "WRITE"):
                 self.gen_write(command[1:])
 
+            if(type == "READ"):
+                self.gen_read(command[1:])
+
+            if(type == "IF"):
+                self.gen_if(command[1:])
+
         self.instructions.append("HALT")
+    
+    # a<b, a-b jzero
+    # a<=b, a-b jpos
+    # a=b?
+    # a!=b?
+    def gen_if(self, command):
+        if_head = command[0]
+        cond = if_head[0]
+        val1 = if_head[1]
+        val2 = if_head[2]
+
+        if(cond):
+            pass
+
+        self.assign_var(val1,'g')
+        self.assign_var(val2,'f')
+        self.reg_minus_reg('g','f')
+        
+
+        if_body = command[1]
+
+        
+        print(f"okok{if_head}")
+        # id = len(self.instructions)
+        # self.instructions =+ [f"temp"]
+        # self.gen(command)
+        # jump = len(self.instructions)
+        # self.instructions[id] = "blblbl"
+    
+    def gen_read(self, command):
+        var_raw = command[0]
+        type, name, idx = Identifier.get_var(var_raw)
+        var = self.program.find_var(name, type)
+
+        if(isinstance(var,Variable) and var.addr == None):
+            self.program.init_var(var)
+
+        self.save_var_addr_to_reg(var,'h',idx,type)
+        self.instructions += [f"READ"]
+        self.save_to_memory('h')
     
     def gen_assign(self,command):
         exp_raw = command[1]
@@ -167,31 +236,30 @@ class CodeGen():
         if(isinstance(var,Variable) and var.addr == None):
             self.program.init_var(var)
 
+        self.save_var_addr_to_reg(var,'h',idx,type)
+
         if(exp_raw[0] not in ["ARR_NUM","ARR_PID","NUM","VAR"]):
-            pass
+            operation = exp_raw[0]
+            val1 = exp_raw[1]
+            val2 = exp_raw[2]
+            self.assign_var(val1,'g')
+            self.assign_var(val2,'f')
+
+            if(operation == "PLUS"):
+                self.reg_plus_reg('g','f')
+
+            if(operation == "MINUS"):
+                self.reg_minus_reg('g','f')
         else:
-            val_type, val_name, val_idx = Identifier.get_var(exp_raw)
+            self.assign_var(exp_raw,'g')
+            self.instructions += [f"GET g"]
 
-            self.save_var_addr_to_reg(var,'h',idx,type)
-                
-            if(val_type == "NUM"):
-                self.save_to_reg(int(val_name),'a')
-            else:
-                val = self.program.find_var(val_name, val_type)
-                if(isinstance(val,Variable) and val.addr == None):
-                    raise RuntimeError(f"Variable {val.name} not initialized")
-                self.save_var_addr_to_reg(val,'g',val_idx,val_type)
-                self.load_from_memory('g')
-
-            self.save_to_memory('h')
+        self.save_to_memory('h')
 
     def gen_write(self,command):
         var_raw = command[0]
         type, name, idx = Identifier.get_var(var_raw)
         var = self.program.find_var(name, type)
-
-        if(isinstance(var,Variable) and var.addr == None):
-            raise RuntimeError(f"Variable {var.name} not initialized")
         
         self.save_var_addr_to_reg(var,'h',idx,type)
         self.load_from_memory('h')
@@ -375,7 +443,7 @@ class Parser(sly_Parser):
 
     @_('value')
     def expression(self, p):
-        return p.value;
+        return p.value
     
     @_('value "+" value')
     def expression(self, p):
@@ -457,7 +525,7 @@ with open(source_code, 'r') as f:
     parser.parse(lexer.tokenize(code))
 
 try:
-    code_gen.gen()
+    code_gen.gen(program.main_commands)
 except RuntimeError as e:
     print(e)
     exit(1)

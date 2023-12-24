@@ -1,9 +1,6 @@
 PROGRAM IS
-	a[5], b[10], c, d
+    a,b
 IN
-    c := 5;
-    b[c] := 10;
-    a[0] := b[c];
-    d := a[0];
-    WRITE d;
+    a := 5; 
+    a := b + 3;
 END
