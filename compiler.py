@@ -128,14 +128,25 @@ class CodeGen():
     def put_to_reg(self, reg):
         self.instructions += [f"PUT {reg}"]
 
+    def put_reg_to_accumulator(self, reg):
+        self.instructions += [f"GET {reg}"]
+
     def add_reg_to_acc(self, reg):
         self.instructions += [f"ADD {reg}"]
 
     def reg_plus_reg(self, reg1, reg2):
-        self.instructions += [f"GET {reg1}", f"ADD {reg2}"]
+        if(reg1 != 'a' and reg2 != 'a'):
+            self.instructions += [f"GET {reg1}"]
+        if(reg1 == 'a'):
+            self.instructions += [f"ADD {reg2}"]
+        if(reg2 == 'a'):
+            self.instructions += [f"ADD {reg1}"]
 
     def reg_minus_reg(self, reg1, reg2):
         self.instructions += [f"GET {reg1}", f"SUB {reg2}"]
+
+    def set_jump(self, idx, ir):
+        self.instructions[idx][-1] = ir
 
     def save_var_addr_to_reg(self, var: Identifier, reg, idx, idx_type):
         if(reg == 'a'): raise RuntimeError("adrr saved to accumulator")
@@ -182,38 +193,53 @@ class CodeGen():
             if(type == "READ"):
                 self.gen_read(command[1:])
 
-            if(type == "IF"):
-                self.gen_if(command[1:])
+            if(type == "IF" or type == "IF ELSE"):
+                self.gen_if(command[1:], type)
 
         self.instructions.append("HALT")
     
-    # a<b, a-b jzero
-    # a<=b, a-b jpos
-    # a=b?
-    # a!=b?
-    def gen_if(self, command):
-        if_head = command[0]
-        cond = if_head[0]
-        val1 = if_head[1]
-        val2 = if_head[2]
+    def gen_condition(self, condition):
+        type = condition[0]
+        val1 = condition[1]
+        val2 = condition[2]
 
-        if(cond):
-            pass
-
-        self.assign_var(val1,'g')
-        self.assign_var(val2,'f')
-        self.reg_minus_reg('g','f')
+        if(type == "GT"):
+            type = "LT"
+            return self.gen_condition((type,val2,val1))
         
+        if(type == "GEQ"):
+            type = "LEQ"
+            return self.gen_condition((type,val2,val1))
 
+        self.gen_operation(val1,val2,"MINUS",'a')
+
+        if(type == "LT"):
+            self.instructions += ["JPOS j"]
+
+        if(type == "LEQ"):
+            self.instructions += ["JZERO j"]
+
+        if(type == "EQ"):
+            self.put_to_reg('h')
+            self.gen_operation(val2,val1,"MINUS",'a')
+            self.reg_plus_reg('a','h')
+            self.instructions += ["JPOS j"]
+
+        if(type == "NEQ"):
+            self.put_to_reg('h')
+            self.gen_operation(val2,val1,"MINUS",'a')
+            self.reg_plus_reg('a','h')
+            self.instructions += ["JZERO j"]
+    
+    def gen_if(self, command, if_type):
+        if_head = command[0]
         if_body = command[1]
 
-        
-        print(f"okok{if_head}")
-        # id = len(self.instructions)
-        # self.instructions =+ [f"temp"]
-        # self.gen(command)
-        # jump = len(self.instructions)
-        # self.instructions[id] = "blblbl"
+        id = len(self.instructions)
+        self.gen_condition(if_head)
+        self.gen(if_body)
+        jump = len(self.instructions)
+        self.set_jump(id,jump)
     
     def gen_read(self, command):
         var_raw = command[0]
@@ -226,6 +252,19 @@ class CodeGen():
         self.save_var_addr_to_reg(var,'h',idx,type)
         self.instructions += [f"READ"]
         self.save_to_memory('h')
+    
+    def gen_operation(self, val1, val2, operation, reg):
+        self.assign_var(val1,'g')
+        self.assign_var(val2,'f')
+        
+        if(operation == "PLUS"):
+            self.reg_plus_reg('g','f')
+
+        if(operation == "MINUS"):
+            self.reg_minus_reg('g','f')
+        
+        if(reg != 'a'):
+            self.put_to_reg(reg)
     
     def gen_assign(self,command):
         exp_raw = command[1]
@@ -242,17 +281,10 @@ class CodeGen():
             operation = exp_raw[0]
             val1 = exp_raw[1]
             val2 = exp_raw[2]
-            self.assign_var(val1,'g')
-            self.assign_var(val2,'f')
-
-            if(operation == "PLUS"):
-                self.reg_plus_reg('g','f')
-
-            if(operation == "MINUS"):
-                self.reg_minus_reg('g','f')
+            self.gen_operation(val1,val2,operation,'a')
         else:
             self.assign_var(exp_raw,'g')
-            self.instructions += [f"GET g"]
+            self.put_reg_to_accumulator('g')
 
         self.save_to_memory('h')
 
