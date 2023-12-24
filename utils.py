@@ -6,10 +6,9 @@ def check_lst_bit(x):
     return (x >> 0) & 1
 
 def reach_number(x,r):
-    if(x == 0):
-        return [f"RST {r}"]
+    if(x == 0):return []
 
-    operations = [f"RST {r}", f"INC {r}"]
+    operations = [f"INC {r}"]
     bit_len = x.bit_length()
     num = 1
     idx = 1
@@ -22,9 +21,6 @@ def reach_number(x,r):
         idx += 1
     
     return operations
-
-def calc_variable_val(command):
-    pass
 
 
 
