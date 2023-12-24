@@ -1,8 +1,6 @@
 PROGRAM IS
-	d,b
+	a[10],d
 IN
     d := 13;
-    WRITE d;
-    b := 5;
-    WRITE b;
+    a[d] := 5;
 END

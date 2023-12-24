@@ -38,7 +38,8 @@ class Array(Identifier):
     def __init__(self, name, size, start_addr):
         super().__init__(name)
         self.start_addr = start_addr
-        self.variables = [Variable()]*size
+        self.size = size
+        self.variables = [Variable() for _ in range(size)]
 
     def get_addr(self, idx):
         return self.variables[idx].get_addr()
@@ -50,7 +51,7 @@ class Array(Identifier):
         self.variables[idx].val = val
 
     def __repr__(self):
-        return f"\n name:{self.name}, start_addr:{self.start_cell}, size:{self.size} \n addr:{self.addr} \n"
+        return f"\n name:{self.name}, start_addr:{self.start_addr}, size:{self.size} \n variables:{self.variables} \n"
 
 class Variable(Identifier):
     def __init__(self, name=None):
@@ -95,6 +96,7 @@ class Program():
         self.main_decl = []
         self.main_commands = []
         self.mem_cells_taken = 0
+        self.curr_command = None
 
     def set_declarations(self, var_list):
         self.main_decl, cells_taken = Identifier.declare_variables(var_list,self.mem_cells_taken)
@@ -132,11 +134,11 @@ class Program():
             raise RuntimeError(f"identifier {name} declared more than once")
         
         if(len(found) == 0):
-            raise RuntimeError(f"{type} {name} not declared")
+            raise RuntimeError(f"{type.__name__} {name} not declared")
         
         var = found[0]
         if(not isinstance(var,type)):
-            raise RuntimeError(f"wrong usage of {type} {name}")
+            raise RuntimeError(f"wrong usage of {var.__class__.__name__} {name}")
         
         return var
     
@@ -151,18 +153,22 @@ class Program():
         var_type = var_raw[0]
         var_name = var_raw[1]
         var = self.find_var(var_name,var_type)
-
-        addr = var.get_addr()
+        
+        addr = None
         idx = None
 
         if(var_type == "ARR_NUM"):
-            idx = int(var[3])
-            addr = var.get_addr(idx)
+            idx = int(var_raw[2])
         if(var_type == "ARR_PID"):
-            idx_obj = self.program.find_var(var_raw[3],"VAR")
+            idx_obj = self.find_var(var_raw[2],"VAR")
+            if(idx_obj.get_addr() == None):
+                raise RuntimeError(f"Variable {var_raw[2]} not initialized")
             idx = idx_obj.val
-            addr = var.get_addr(idx)
+        
+        if(isinstance(var,Array) and idx >= var.size):
+            raise RuntimeError(f"Array index out of range")
 
+        addr = var.get_addr(idx)
         if(addr == None):
             self.init_var(var,idx)
         addr = var.get_addr(idx)
@@ -193,6 +199,7 @@ class CodeGen():
         main_commands = self.program.main_commands
 
         for command in main_commands:
+            self.program.curr_command = command
             type = command[0]
 
             if(type == "ASSIGN"):
