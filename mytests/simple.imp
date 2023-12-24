@@ -1,8 +1,14 @@
 PROGRAM IS
-    a,b
+    a,b,c[10]
 IN
-    a := 5; 
-    IF a < 5 THEN
-        WRITE a;
+    READ a;
+    READ b;
+
+    IF a > b THEN
+        c[3] := a;
+    ELSE
+        c[3] := b;
     ENDIF
+
+    WRITE c[3];
 END

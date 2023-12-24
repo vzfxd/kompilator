@@ -135,18 +135,14 @@ class CodeGen():
         self.instructions += [f"ADD {reg}"]
 
     def reg_plus_reg(self, reg1, reg2):
-        if(reg1 != 'a' and reg2 != 'a'):
-            self.instructions += [f"GET {reg1}"]
-        if(reg1 == 'a'):
-            self.instructions += [f"ADD {reg2}"]
-        if(reg2 == 'a'):
-            self.instructions += [f"ADD {reg1}"]
+        self.instructions += [f"GET {reg1}",f"ADD {reg2}"]
 
     def reg_minus_reg(self, reg1, reg2):
         self.instructions += [f"GET {reg1}", f"SUB {reg2}"]
 
     def set_jump(self, idx, ir):
-        self.instructions[idx][-1] = ir
+        new_ir = self.instructions[idx][:-1] + str(ir)
+        self.instructions[idx] = new_ir
 
     def save_var_addr_to_reg(self, var: Identifier, reg, idx, idx_type):
         if(reg == 'a'): raise RuntimeError("adrr saved to accumulator")
@@ -195,8 +191,6 @@ class CodeGen():
 
             if(type == "IF" or type == "IF ELSE"):
                 self.gen_if(command[1:], type)
-
-        self.instructions.append("HALT")
     
     def gen_condition(self, condition):
         type = condition[0]
@@ -219,27 +213,35 @@ class CodeGen():
         if(type == "LEQ"):
             self.instructions += ["JZERO j"]
 
-        if(type == "EQ"):
+        if(type in ["EQ","NEQ"]):
             self.put_to_reg('h')
             self.gen_operation(val2,val1,"MINUS",'a')
             self.reg_plus_reg('a','h')
-            self.instructions += ["JPOS j"]
-
-        if(type == "NEQ"):
-            self.put_to_reg('h')
-            self.gen_operation(val2,val1,"MINUS",'a')
-            self.reg_plus_reg('a','h')
-            self.instructions += ["JZERO j"]
-    
+            if(type == "EQ"):
+                self.instructions += ["JPOS j"]
+            else:
+                self.instructions += ["JZERO j"]
+            
     def gen_if(self, command, if_type):
         if_head = command[0]
         if_body = command[1]
-
-        id = len(self.instructions)
+    
         self.gen_condition(if_head)
+        id_if = len(self.instructions)-1
         self.gen(if_body)
-        jump = len(self.instructions)
-        self.set_jump(id,jump)
+        jump_if = len(self.instructions)
+
+        if(if_type == "IF ELSE"):
+            else_body = command[2]
+            id_else = len(self.instructions)
+            self.instructions.append("JUMP j")
+            self.gen(else_body)
+            jump_else = len(self.instructions)
+            self.set_jump(id_else,jump_else)
+            jump_if += 1
+
+        self.set_jump(id_if,jump_if)
+
     
     def gen_read(self, command):
         var_raw = command[0]
@@ -558,6 +560,7 @@ with open(source_code, 'r') as f:
 
 try:
     code_gen.gen(program.main_commands)
+    code_gen.instructions.append("HALT")
 except RuntimeError as e:
     print(e)
     exit(1)
