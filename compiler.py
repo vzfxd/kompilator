@@ -19,7 +19,7 @@ class Identifier():
                 size = int(idx)
                 var_obj = Array(name,size,program_memory+memory_taken)
                 memory_taken += size
-            else:
+            if(type == "VAR"):
                 var_obj = Variable(name)
             
             l.append(var_obj)
@@ -51,6 +51,21 @@ class Variable(Identifier):
 
     def __repr__(self):
         return f"\n name:{self.name}, addr:{self.addr}\n"
+    
+class Procedure():
+    def __init__(self, name, commands):
+        self.name = name
+        self.commands = commands
+        self.decl =  []
+
+    def declare_variables(self, var_list,mem):
+        decl,mem = Identifier.declare_variables(var_list,mem)
+        self.decl += decl
+        return mem
+
+    def inject_args(self, args):
+        for arg in args:
+            pass
 
 class Program():
 
@@ -59,6 +74,7 @@ class Program():
         self.main_decl = []
         self.main_commands = []
         self.mem_cells_taken = 0
+        self.scope = self.main_decl
 
     def set_declarations(self, var_list):
         self.main_decl, cells_taken = Identifier.declare_variables(var_list,self.mem_cells_taken)
@@ -67,18 +83,23 @@ class Program():
     def set_commands(self, commands):
         self.main_commands = commands
 
-    def find_var(self, name, type="VAR", scope="main"):
+    def set_procedures(self, procedures):
+        for p in procedures:
+            head = p[0]
+            name = head[0]
+            commands = p[1]
+            self.procedures.append(Procedure(name,commands))
+
+    def find_procedure(self,name,args):
+        pass
+
+    def find_var(self, name, type="VAR"):
         if(type == "VAR"):
             type = Variable
         else:
             type = Array
 
-        var_list = None
-        if(scope == "main"):
-            var_list = self.main_decl
-        else:
-            pass
-            #TODO: scope jakiejs procedury
+        var_list = self.scope
 
         found = []
         for var in var_list:
@@ -191,6 +212,19 @@ class CodeGen():
 
             if(type == "IF" or type == "IF ELSE"):
                 self.gen_if(command[1:], type)
+
+            if(type == "WHILE"):
+                self.gen_while(command[1:])
+
+            if(type == "REPEAT"):
+                self.gen_repeat(command[1:])
+
+            if(type == "CALL"):
+                self.gen_call(command[1:])
+
+    def gen_call(self, command):
+        name,args = command[0],command[1]
+        p = self.program.find_procedure(name,args)
     
     def gen_condition(self, condition):
         type = condition[0]
@@ -205,15 +239,16 @@ class CodeGen():
             type = "LEQ"
             return self.gen_condition((type,val2,val1))
 
-        self.gen_operation(val1,val2,"MINUS",'a')
-
         if(type == "LT"):
-            self.instructions += ["JPOS j"]
+            self.gen_operation(val2,val1,"MINUS",'a')
+            self.instructions += ["JZERO j"]
 
         if(type == "LEQ"):
+            self.gen_operation(val1,val2,"MINUS",'a')
             self.instructions += ["JPOS j"]
 
         if(type in ["EQ","NEQ"]):
+            self.gen_operation(val1,val2,"MINUS",'a')
             self.put_to_reg('h')
             self.gen_operation(val2,val1,"MINUS",'a')
             self.reg_plus_reg('a','h')
@@ -221,27 +256,48 @@ class CodeGen():
                 self.instructions += ["JPOS j"]
             else:
                 self.instructions += ["JZERO j"]
+
+    def gen_while(self, command):
+        while_head = command[0]
+        while_body = command[1]
+
+        cond_start = len(self.instructions)
+        self.gen_condition(while_head)
+        jump_idx = len(self.instructions)-1
+        self.gen(while_body)
+        self.instructions += [f"JUMP {cond_start}"]
+        end_while = len(self.instructions)
+        self.set_jump(jump_idx,end_while)
+
+    def gen_repeat(self, command):
+        repeat_head = command[0]
+        repeat_body = command[1]
+
+        start_repeat = len(self.instructions)
+        self.gen(repeat_body)
+        self.gen_condition(repeat_head)
+        jump = len(self.instructions)-1
+        self.set_jump(jump,start_repeat)
     
-    # a <= b, a-b
     def gen_if(self, command, if_type):
         if_head = command[0]
         if_body = command[1]
     
         self.gen_condition(if_head)
-        id_if = len(self.instructions)-1
+        if_jump = len(self.instructions)-1
         self.gen(if_body)
-        jump_if = len(self.instructions)
+        end_if = len(self.instructions)
 
         if(if_type == "IF ELSE"):
             else_body = command[2]
-            id_else = len(self.instructions)
             self.instructions.append("JUMP j")
+            else_jump = len(self.instructions)-1
             self.gen(else_body)
-            jump_else = len(self.instructions)
-            self.set_jump(id_else,jump_else)
-            jump_if += 1
+            else_end = len(self.instructions)
+            self.set_jump(else_jump,else_end)
+            end_if += 1
 
-        self.set_jump(id_if,jump_if)
+        self.set_jump(if_jump,end_if)
 
     
     def gen_read(self, command):
@@ -364,13 +420,13 @@ class Parser(sly_Parser):
 
     @_('procedures main')
     def program_all(self, p):
-       #self.ctx.set_procedures(p.procedures)
+        self.ctx.set_procedures(p.procedures)
         self.ctx.set_declarations(p.main[0])
         self.ctx.set_commands(p.main[1])            
     
     @_('procedures PROCEDURE proc_head IS declarations IN commands END')
     def procedures(self, p):
-        return p.procedures + [(p.proc_head, p.declarations, p.commands)]
+        return p.procedures + [(p.proc_head, p.commands, p.declarations)]
 
     @_('procedures PROCEDURE proc_head IS IN commands END')
     def procedures(self, p):
