@@ -74,7 +74,7 @@ class Program():
         self.main_decl = []
         self.main_commands = []
         self.mem_cells_taken = 0
-        self.scope = self.main_decl
+        self.scope = []
 
     def set_declarations(self, var_list):
         self.main_decl, cells_taken = Identifier.declare_variables(var_list,self.mem_cells_taken)
@@ -197,7 +197,12 @@ class CodeGen():
             self.load_from_memory(reg)
             self.put_to_reg(reg)
 
-    def gen(self, commands):
+    def gen(self, commands, scope=None):
+        if(scope == None):
+            self.program.scope = self.program.main_decl
+        else:
+            self.program.scope = scope
+
         for command in commands:
             type = command[0]
 
