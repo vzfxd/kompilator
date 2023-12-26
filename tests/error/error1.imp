@@ -2,7 +2,7 @@
 PROCEDURE pa(T a, b) IS
  c[5],d
 IN
-  c:=e;
+  c[0]:=e;
   a:=c+d;
 END
 

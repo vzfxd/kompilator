@@ -1,22 +1,16 @@
-PROCEDURE pa(a,b) IS
-    c,d
+PROCEDURE gcd(a,b,c) IS
+  x,y
 IN
-  a:=a+b;
-  b:=a-b;
-END
-
-PROCEDURE pb(a,b,T c) IS
-IN
-  pa(a,b);
-  pa(a,b);
+  a := 10;
+  b := 20;
+  c := 30;
 END
 
 PROGRAM IS
-  a,b,c[10]
+  x,y,z
 IN
-  READ a;
-  READ b;
-  pb(a,b,c);
-  WRITE a;
-  WRITE b;
+  gcd(x,y,z);
+  WRITE x;
+  WRITE y;
+  WRITE z;
 END

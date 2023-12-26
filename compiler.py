@@ -7,9 +7,12 @@ from sys import argv
 class Identifier():
     def __init__(self, name):
         self.name = name
+
+    def check_type(var1, var2):
+        return var1.__class__.__name__ == var2.__class__.__name__
     
     def declare_variables(var_list, program_memory):
-        if(var_list == None): return []
+        if(var_list == None): return [],0
         l = []
         memory_taken = 0
         for var in var_list:
@@ -33,13 +36,19 @@ class Identifier():
         return var_type, var_name, var_idx
 
 class Array(Identifier):
-    def __init__(self, name, size, start_addr):
+    def __init__(self, name, size=None, start_addr=None):
         super().__init__(name)
         self.start_addr = start_addr
         self.size = size
 
     def __repr__(self):
         return f"\n name:{self.name}, start_addr:{self.start_addr}, size:{self.size} \n"
+    
+    def set_addr(self, addr):
+        self.start_addr = addr
+    
+    def get_addr(self):
+        return self.start_addr
 
 class Variable(Identifier):
     def __init__(self, name=None):
@@ -49,23 +58,49 @@ class Variable(Identifier):
     def set_addr(self, addr):
         self.addr = addr
 
+    def get_addr(self):
+        return self.addr
+
     def __repr__(self):
         return f"\n name:{self.name}, addr:{self.addr}\n"
     
 class Procedure():
-    def __init__(self, name, commands):
+    def __init__(self, name, args, commands, decl):
         self.name = name
         self.commands = commands
-        self.decl =  []
+        self.decl_raw = decl
+        self.decl = []
+        self.args = self.declare_args(args)
 
-    def declare_variables(self, var_list,mem):
-        decl,mem = Identifier.declare_variables(var_list,mem)
-        self.decl += decl
+    def declare_args(self,args):
+        l = []
+        for arg in args:
+            type,name = arg[0], arg[1]
+            if(type == "ARR"):
+                l.append(Array(name))
+            if(type == "VAR"):
+                l.append(Variable(name))
+        return l
+
+    def declare_variables(self, mem):
+        self.decl,mem = Identifier.declare_variables(self.decl_raw,mem)
+        
+        for arg in self.args:
+            for var in self.decl:
+                if(arg.name == var.name):
+                    raise RuntimeError(f"Declared {var.__class__.__name__} {var.name} has same name as {arg.__class__.__name__} {arg.name}")
+        
         return mem
 
     def inject_args(self, args):
-        for arg in args:
-            pass
+        self.decl += self.args
+        for idx,arg in enumerate(self.args):
+            arg.set_addr(args[idx].get_addr())
+
+    def update_addr(self, args):
+        for idx,arg in enumerate(self.args):
+            args[idx].set_addr(arg.get_addr())
+
 
 class Program():
 
@@ -75,6 +110,8 @@ class Program():
         self.main_commands = []
         self.mem_cells_taken = 0
         self.scope = []
+        self.curr_procedure = None
+        self.curr_command = None
 
     def set_declarations(self, var_list):
         self.main_decl, cells_taken = Identifier.declare_variables(var_list,self.mem_cells_taken)
@@ -83,17 +120,39 @@ class Program():
     def set_commands(self, commands):
         self.main_commands = commands
 
+    def set_scope(self, decl):
+        self.scope = decl
+
     def set_procedures(self, procedures):
         for p in procedures:
             head = p[0]
             name = head[0]
+            args = head[1]
             commands = p[1]
-            self.procedures.append(Procedure(name,commands))
+            decl = None if len(p)<3 else p[2] 
+            self.procedures.append(Procedure(name,args,commands,decl))
 
     def find_procedure(self,name,args):
-        pass
+        found = []
+        
+        for p in self.procedures:
+            if(p.name == name):
+                found.append(p)
 
-    def find_var(self, name, type="VAR"):
+        if(len(found) == 0):
+            raise RuntimeError(f"Procedure {name} not declared")
+        
+        if(len(found)>1):
+            raise RuntimeError(f"Procedure {name} declared more than once")
+        
+        p:Procedure = found[0]
+        for idx,arg in enumerate(args):
+            if(Identifier.check_type(arg,p.args[idx]) == False):
+                raise RuntimeError(f"type mismatch between {arg.__class__.__name__} {arg.name} and {p.args[idx].__class__.__name__} {p.args[idx].name}")
+            
+        return p
+
+    def find_var(self, name, type="VAR", type_check=True):
         if(type == "VAR"):
             type = Variable
         else:
@@ -113,8 +172,9 @@ class Program():
             raise RuntimeError(f"{type.__name__} {name} not declared")
         
         var = found[0]
-        if(not isinstance(var,type)):
-            raise RuntimeError(f"wrong usage of {var.__class__.__name__} {name}")
+        if(type_check):
+            if(not isinstance(var,type)):
+                raise RuntimeError(f"wrong usage of {var.__class__.__name__} {name}")
         
         return var
     
@@ -170,7 +230,7 @@ class CodeGen():
         
         if(isinstance(var,Variable)):
             if(var.addr == None):
-                raise RuntimeError(f"Variable {var.name} not initialized")
+                raise RuntimeError(f"Variable {var.name} not initialized\n")
             self.save_to_reg(var.addr, reg)
         else:
             if(idx_type == "ARR_NUM"):
@@ -197,13 +257,9 @@ class CodeGen():
             self.load_from_memory(reg)
             self.put_to_reg(reg)
 
-    def gen(self, commands, scope=None):
-        if(scope == None):
-            self.program.scope = self.program.main_decl
-        else:
-            self.program.scope = scope
-
+    def gen(self, commands):
         for command in commands:
+            self.program.curr_command = command
             type = command[0]
 
             if(type == "ASSIGN"):
@@ -228,9 +284,31 @@ class CodeGen():
                 self.gen_call(command[1:])
 
     def gen_call(self, command):
-        name,args = command[0],command[1]
-        p = self.program.find_procedure(name,args)
-    
+        p = command[0]
+        name,args = p[0],p[1]
+        arg_list = []
+
+        if(self.program.curr_procedure == name):
+            raise RuntimeError("Recursion prohibited")
+        
+        for arg in args:
+            arg_list.append(self.program.find_var(arg,"dummy",False))
+        
+        p:Procedure = self.program.find_procedure(name,arg_list)
+        mem = p.declare_variables(self.program.mem_cells_taken)
+        self.program.mem_cells_taken += mem
+        p.inject_args(arg_list)
+        
+        prev_scope = self.program.scope
+        prev_proc = self.program.curr_procedure
+
+        self.program.curr_procedure = name
+        self.program.scope = p.decl
+        self.gen(p.commands)
+        p.update_addr(arg_list)
+        self.program.scope = prev_scope
+        self.program.curr_procedure = prev_proc
+
     def gen_condition(self, condition):
         type = condition[0]
         val1 = condition[1]
@@ -336,6 +414,7 @@ class CodeGen():
         type, name, idx = Identifier.get_var(var_raw)
         
         var = self.program.find_var(name, type)
+        
         if(isinstance(var,Variable) and var.addr == None):
             self.program.init_var(var)
 
@@ -427,7 +506,8 @@ class Parser(sly_Parser):
     def program_all(self, p):
         self.ctx.set_procedures(p.procedures)
         self.ctx.set_declarations(p.main[0])
-        self.ctx.set_commands(p.main[1])            
+        self.ctx.set_commands(p.main[1]) 
+        self.ctx.set_scope(self.ctx.main_decl)           
     
     @_('procedures PROCEDURE proc_head IS declarations IN commands END')
     def procedures(self, p):
