@@ -106,22 +106,17 @@ class Program():
 
     def __init__(self):
         self.procedures = []
-        self.main_decl = []
         self.main_commands = []
         self.mem_cells_taken = 0
         self.scope = []
         self.curr_procedure = None
-        self.curr_command = None
 
     def set_declarations(self, var_list):
-        self.main_decl, cells_taken = Identifier.declare_variables(var_list,self.mem_cells_taken)
+        self.scope, cells_taken = Identifier.declare_variables(var_list,self.mem_cells_taken)
         self.mem_cells_taken += cells_taken
 
     def set_commands(self, commands):
         self.main_commands = commands
-
-    def set_scope(self, decl):
-        self.scope = decl
 
     def set_procedures(self, procedures):
         for p in procedures:
@@ -158,10 +153,8 @@ class Program():
         else:
             type = Array
 
-        var_list = self.scope
-
         found = []
-        for var in var_list:
+        for var in self.scope:
             if(var.name == name):
                 found.append(var)
             
@@ -183,7 +176,7 @@ class Program():
         self.mem_cells_taken += 1
 
     def __repr__(self):
-        x = f"PROCEDURES:\n\n{self.procedures} \n\n DECL IN MAIN:\n{self.main_decl}\n\n"
+        x = f"PROCEDURES:\n\n{self.procedures} \n\n DECL IN MAIN:\n{self.scope}\n\n"
         for c in self.main_commands:
             x += f"{c}\n"
         return f"{x}\n\n MEM CELLS TAKEN:{self.mem_cells_taken}"
@@ -259,7 +252,6 @@ class CodeGen():
 
     def gen(self, commands):
         for command in commands:
-            self.program.curr_command = command
             type = command[0]
 
             if(type == "ASSIGN"):
@@ -506,8 +498,7 @@ class Parser(sly_Parser):
     def program_all(self, p):
         self.ctx.set_procedures(p.procedures)
         self.ctx.set_declarations(p.main[0])
-        self.ctx.set_commands(p.main[1]) 
-        self.ctx.set_scope(self.ctx.main_decl)           
+        self.ctx.set_commands(p.main[1])          
     
     @_('procedures PROCEDURE proc_head IS declarations IN commands END')
     def procedures(self, p):
