@@ -1,6 +1,6 @@
 PROGRAM IS
   a
 IN
-  a := 25*4;
+  a := 100 % 30;
   WRITE a;
 END

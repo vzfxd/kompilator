@@ -110,6 +110,7 @@ class Program():
         self.mem_cells_taken = 0
         self.scope = []
         self.curr_procedure = None
+        self.curr_command = None
 
     def set_declarations(self, var_list):
         self.scope, cells_taken = Identifier.declare_variables(var_list,self.mem_cells_taken)
@@ -162,7 +163,7 @@ class Program():
             raise RuntimeError(f"identifier {name} declared more than once")
         
         if(len(found) == 0):
-            raise RuntimeError(f"{type.__name__} {name} not declared")
+            raise RuntimeError(f"{type.__name__} {name} not declared\n{self.curr_command}")
         
         var = found[0]
         if(type_check):
@@ -252,6 +253,7 @@ class CodeGen():
 
     def gen(self, commands):
         for command in commands:
+            self.program.curr_command = command
             type = command[0]
 
             if(type == "ASSIGN"):
@@ -386,6 +388,20 @@ class CodeGen():
         self.save_var_addr_to_reg(var,'h',idx,type)
         self.instructions += [f"READ"]
         self.save_to_memory('h')
+
+    def gen_mul(self):
+        self.instructions += [f"RST e",f"GET g"]
+        while_jump = len(self.instructions)
+        self.instructions += [ f"JZERO j",f"SHR a",f"SHL a",f"INC a",f"SUB g"]
+        if_jump = len(self.instructions)
+        self.instructions += [f"JPOS j",f"GET e",f"ADD f",f"PUT e",]
+        if_end = len(self.instructions)
+        self.instructions += [f"SHR g",f"SHL f",f"JUMP {while_jump-1}"]
+        while_end = len(self.instructions)
+
+        self.set_jump(while_jump,while_end)
+        self.set_jump(if_jump,if_end)
+        self.put_reg_to_accumulator('e')
     
     def gen_operation(self, val1, val2, operation, reg):
         self.assign_var(val1,'g')
@@ -398,22 +414,56 @@ class CodeGen():
             self.reg_minus_reg('g','f')
 
         if(operation == "MUL"):
-            
-            self.instructions += [f"RST e",f"GET g"]
+            self.gen_mul()
+
+        '''
+        def divide_logarithmically(a, b):
+            r = 0
+
+            while a >= b:
+                power = 1
+                divisor = b
+
+                while a >= divisor * 2:
+                    divisor *= 2
+                    power *= 2
+
+            a -= divisor
+            r += power(DIV) || r = a(MOD)
+
+        return quotient
+        '''
+        if(operation == "DIV" or operation == "MOD"):
+            self.instructions += ["RST e"]
+            start_while = len(self.instructions)
+            self.reg_minus_reg('f','g')
             while_jump = len(self.instructions)
-            self.instructions += [ f"JZERO j",f"SHR a",f"SHL a",f"INC a",f"SUB g"]
-            if_jump = len(self.instructions)
-            self.instructions += [f"JPOS j",f"GET e",f"ADD f",f"PUT e",]
-            if_end = len(self.instructions)
-            self.instructions += [f"SHR g",f"SHL f",f"JUMP {while_jump-1}"]
-            while_end = len(self.instructions)
+            self.instructions += ["JPOS j"]
+            self.save_to_reg(1,'b')
+            self.instructions += ["GET f", "PUT c"]
+            start_inner_while = len(self.instructions)
+            self.instructions += ["SHL c"]
+            self.reg_minus_reg('c','g')
+            inner_while_jump = len(self.instructions)
+            self.instructions += ["JPOS j"]
+            self.instructions += ["SHL b", f"JUMP {start_inner_while}"]
+            inner_while_end = len(self.instructions)
+            self.instructions += ["SHR c"]
+            self.reg_minus_reg('g','c')
+            self.put_to_reg('g')
 
-            self.set_jump(while_jump,while_end)
-            self.set_jump(if_jump,if_end)
+            if(operation == "DIV"):
+                self.reg_plus_reg('e','b')
+                self.put_to_reg('e')
+            if(operation == "MOD"):
+                self.instructions += ["GET g","PUT e"]
+
+            self.instructions += [f"JUMP {start_while}"]
+            end_while = len(self.instructions)
+
+            self.set_jump(while_jump,end_while)
+            self.set_jump(inner_while_jump, inner_while_end)
             self.put_reg_to_accumulator('e')
-
-        if(operation == "DIV"):
-            pass
         
         if(reg != 'a'):
             self.put_to_reg(reg)
@@ -444,10 +494,13 @@ class CodeGen():
     def gen_write(self,command):
         var_raw = command[0]
         type, name, idx = Identifier.get_var(var_raw)
-        var = self.program.find_var(name, type)
-        
-        self.save_var_addr_to_reg(var,'h',idx,type)
-        self.load_from_memory('h')
+        if(type == "NUM"):
+            self.save_to_reg(int(name),'a')
+        else:
+            var = self.program.find_var(name, type)
+            self.save_var_addr_to_reg(var,'h',idx,type)
+            self.load_from_memory('h')
+
         self.instructions += [f"WRITE"]
 
 class Lexer(sly_Lexer):
