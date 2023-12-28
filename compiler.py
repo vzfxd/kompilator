@@ -388,20 +388,6 @@ class CodeGen():
         self.save_var_addr_to_reg(var,'h',idx,type)
         self.instructions += [f"READ"]
         self.save_to_memory('h')
-
-    def gen_mul(self):
-        self.instructions += [f"RST e",f"GET g"]
-        while_jump = len(self.instructions)
-        self.instructions += [ f"JZERO j",f"SHR a",f"SHL a",f"INC a",f"SUB g"]
-        if_jump = len(self.instructions)
-        self.instructions += [f"JPOS j",f"GET e",f"ADD f",f"PUT e",]
-        if_end = len(self.instructions)
-        self.instructions += [f"SHR g",f"SHL f",f"JUMP {while_jump-1}"]
-        while_end = len(self.instructions)
-
-        self.set_jump(while_jump,while_end)
-        self.set_jump(if_jump,if_end)
-        self.put_reg_to_accumulator('e')
     
     def gen_operation(self, val1, val2, operation, reg):
         self.assign_var(val1,'g')
@@ -414,7 +400,18 @@ class CodeGen():
             self.reg_minus_reg('g','f')
 
         if(operation == "MUL"):
-            self.gen_mul()
+            self.instructions += [f"RST e",f"GET g"]
+            while_jump = len(self.instructions)
+            self.instructions += [ f"JZERO j",f"SHR a",f"SHL a",f"INC a",f"SUB g"]
+            if_jump = len(self.instructions)
+            self.instructions += [f"JPOS j",f"GET e",f"ADD f",f"PUT e",]
+            if_end = len(self.instructions)
+            self.instructions += [f"SHR g",f"SHL f",f"JUMP {while_jump-1}"]
+            while_end = len(self.instructions)
+
+            self.set_jump(while_jump,while_end)
+            self.set_jump(if_jump,if_end)
+            self.put_reg_to_accumulator('e')
 
         '''
         def divide_logarithmically(a, b):
