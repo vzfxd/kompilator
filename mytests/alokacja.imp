@@ -1,9 +1,0 @@
-#alokacja pamieci
-PROGRAM IS
-	a[10], b[5], c, d
-IN
-    c := 5 + 3;
-    d := 7;
-    a[3] := c;
-    b[d] := c;
-END

@@ -1,6 +1,0 @@
-PROGRAM IS
-  a
-IN
-  a := 100 % 30;
-  WRITE a;
-END
