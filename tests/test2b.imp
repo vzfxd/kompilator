@@ -1,0 +1,21 @@
+PROCEDURE test(a) IS
+  b, c
+IN
+  c := 0;
+  WHILE c < 5 DO
+    IF c > 0 THEN
+      b := b + 5;
+    ELSE
+      b := 5;
+    ENDIF
+    c := c + 1;
+  ENDWHILE
+  a := b;
+END
+
+PROGRAM IS
+  a
+IN
+  test(a);
+  WRITE a;
+END

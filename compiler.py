@@ -415,7 +415,7 @@ class CodeGen():
 
         '''
         def divide_logarithmically(a, b):
-            r = 0
+            r = 0(DIV) | r = a(MOD)
 
             while a >= b:
                 power = 1
@@ -431,7 +431,11 @@ class CodeGen():
         return quotient
         '''
         if(operation == "DIV" or operation == "MOD"):
-            self.instructions += ["RST e"]
+            if(operation == "MOD"):
+                self.instructions += ["GET g", "PUT e"]
+            if(operation == "DIV"):
+                self.instructions += ["RST e"]
+
             start_while = len(self.instructions)
             self.reg_minus_reg('f','g')
             while_jump = len(self.instructions)
