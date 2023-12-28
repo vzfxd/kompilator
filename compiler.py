@@ -396,6 +396,24 @@ class CodeGen():
 
         if(operation == "MINUS"):
             self.reg_minus_reg('g','f')
+
+        if(operation == "MUL"):
+            
+            self.instructions += [f"RST e",f"GET g"]
+            while_jump = len(self.instructions)
+            self.instructions += [ f"JZERO j",f"SHR a",f"SHL a",f"INC a",f"SUB g"]
+            if_jump = len(self.instructions)
+            self.instructions += [f"JPOS j",f"GET e",f"ADD f",f"PUT e",]
+            if_end = len(self.instructions)
+            self.instructions += [f"SHR g",f"SHL f",f"JUMP {while_jump-1}"]
+            while_end = len(self.instructions)
+
+            self.set_jump(while_jump,while_end)
+            self.set_jump(if_jump,if_end)
+            self.put_reg_to_accumulator('e')
+
+        if(operation == "DIV"):
+            pass
         
         if(reg != 'a'):
             self.put_to_reg(reg)

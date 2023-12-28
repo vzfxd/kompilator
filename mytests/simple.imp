@@ -1,16 +1,6 @@
-PROCEDURE gcd(a,b,c) IS
-  x,y
-IN
-  a := 10;
-  b := 20;
-  c := 30;
-END
-
 PROGRAM IS
-  x,y,z
+  a
 IN
-  gcd(x,y,z);
-  WRITE x;
-  WRITE y;
-  WRITE z;
+  a := 25*4;
+  WRITE a;
 END
