@@ -2,9 +2,6 @@ def check_bit(x,idx,bit_len):
     idx = bit_len - idx - 1
     return (x >> idx) & 1
 
-def check_lst_bit(x):
-    return (x >> 0) & 1
-
 def reach_number(x,r):
     if(x == 0):return []
 
@@ -15,7 +12,7 @@ def reach_number(x,r):
     while(num != x):
         num = num * 2
         operations.append(f"SHL {r}")
-        if(check_lst_bit(num) != check_bit(x,idx,bit_len)):
+        if(check_bit(x,idx,bit_len) == 1):
             num = num + 1
             operations.append(f"INC {r}")
         idx += 1
